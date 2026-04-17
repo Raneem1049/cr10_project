@@ -38,17 +38,21 @@ class TestPickPlacePlanning(unittest.TestCase):
         _, release = mirrored_target_pose(params)
         self.assertAlmostEqual(release.x, -params.x)
         self.assertAlmostEqual(release.y, params.y)
-        self.assertAlmostEqual(
-            release.wrist_yaw,
-            tool_yaw_from_cube(mirror_yaw(params.alpha)),
-            places=6,
+        # Effective gripper yaw in world frame matches mirrored cube (mod 180°)
+        q1 = math.atan2(release.y, release.x)
+        effective_yaw = q1 - release.wrist_yaw
+        expected_yaw = tool_yaw_from_cube(mirror_yaw(params.alpha))
+        diff = math.atan2(
+            math.sin(effective_yaw - expected_yaw),
+            math.cos(effective_yaw - expected_yaw),
+        )
+        self.assertTrue(
+            abs(diff) < 1e-6 or abs(abs(diff) - math.pi) < 1e-6,
         )
 
     def test_top_down_grasp_uses_joint5_instead_of_joint6(self) -> None:
         params = CubeParameters(alpha=math.radians(20.0))
         _, release = mirrored_target_pose(params)
-
-        self.assertAlmostEqual(release.wrist_yaw, math.radians(-20.0), places=6)
 
         joints = self.kinematics.inverse_kinematics(
             release.x,
@@ -58,6 +62,17 @@ class TestPickPlacePlanning(unittest.TestCase):
         )
         self.assertAlmostEqual(joints[4], release.wrist_yaw, places=6)
         self.assertAlmostEqual(joints[5], 0.0, places=6)
+
+        # Effective gripper yaw matches the mirrored cube orientation (mod 180°)
+        effective_yaw = joints[0] - joints[4]
+        expected_yaw = tool_yaw_from_cube(mirror_yaw(params.alpha))
+        diff = math.atan2(
+            math.sin(effective_yaw - expected_yaw),
+            math.cos(effective_yaw - expected_yaw),
+        )
+        self.assertTrue(
+            abs(diff) < 1e-5 or abs(abs(diff) - math.pi) < 1e-5,
+        )
 
     def test_default_pick_place_plan_is_reachable(self) -> None:
         params = CubeParameters()

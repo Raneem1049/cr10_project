@@ -109,3 +109,8 @@ Project/
 - All robot motion is driven by custom IK and custom ROS 2 nodes.
 - Part 1 and Part 2 are both launched through standard ROS 2 launch files.
 # Project
+
+
+source install/setup.bash
+ros2 launch cr10_project part1_demo.launch.py
+ros2 launch cr10_project part2_demo.launch.py

@@ -17,7 +17,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 
-from .cr10_kinematics import CR10Kinematics
+from .cr10_kinematics import CR10Kinematics, normalize_angle
 from .trajectory_generators import (
     CartesianPose,
     interpolate_pose,
@@ -97,6 +97,24 @@ def tool_yaw_from_cube(alpha: float) -> float:
     return wrapped
 
 
+def _grasp_joint5(q1: float, cube_alpha: float) -> float:
+    """Compute the joint-5 value that aligns the gripper jaws with the cube.
+
+    For a top-down grasp (pitch = π/2, q6 = 0) the effective gripper yaw in
+    the world XY-plane is ``q1 − q5``.  To align with a cube at world-frame
+    orientation *cube_alpha* we therefore need ``q5 = q1 − α_eff``, where
+    α_eff is the cube angle reduced to [−π/2, π/2] via 180° gripper symmetry.
+    A further π-reduction keeps the result inside the joint-5 limits (±120°).
+    """
+    alpha_eff = tool_yaw_from_cube(cube_alpha)
+    q5 = normalize_angle(q1 - alpha_eff)
+    if q5 > math.radians(120.0):
+        q5 -= math.pi
+    elif q5 < math.radians(-120.0):
+        q5 += math.pi
+    return q5
+
+
 def source_grasp_pose(
     params: CubeParameters,
     *,
@@ -105,7 +123,8 @@ def source_grasp_pose(
     tool = gripper or Robotiq2F85()
     center = cube_center_robot_frame(params)
     top_surface_z = center[2] + params.c / 2.0
-    yaw = tool_yaw_from_cube(params.alpha)
+    q1 = math.atan2(center[1], center[0])
+    yaw = _grasp_joint5(q1, params.alpha)
     approach = CartesianPose(center[0], center[1], top_surface_z + tool.approach_clearance, yaw)
     grasp = CartesianPose(center[0], center[1], top_surface_z, yaw)
     return approach, grasp
@@ -119,7 +138,8 @@ def mirrored_target_pose(
     tool = gripper or Robotiq2F85()
     mirrored_center = mirror_point(cube_center_robot_frame(params))
     top_surface_z = mirrored_center[2] + params.c / 2.0
-    yaw = tool_yaw_from_cube(mirror_yaw(params.alpha))
+    q1 = math.atan2(mirrored_center[1], mirrored_center[0])
+    yaw = _grasp_joint5(q1, mirror_yaw(params.alpha))
     approach = CartesianPose(
         mirrored_center[0],
         mirrored_center[1],
@@ -322,7 +342,7 @@ class CR10PickPlaceNode(Node):
 
         self.trace_points: deque[Point] = deque(maxlen=self.trace_max_points)
         self.step_index = 0
-        self.scene_pub.publish(self._build_scene_markers(self.trajectory[0]))
+        self.scene_pub.publish(self._build_scene_markers(self.trajectory[0], self.joint_sequence[0]))
         self.timer = self.create_timer(1.0 / self.publish_rate_hz, self._on_timer)
 
         plan = summarize_plan(self.params, gripper=self.gripper)
@@ -341,12 +361,12 @@ class CR10PickPlaceNode(Node):
                 return
             self.step_index = 0
             self.trace_points.clear()
-            self.scene_pub.publish(self._build_scene_markers(self.trajectory[0]))
+            self.scene_pub.publish(self._build_scene_markers(self.trajectory[0], self.joint_sequence[0]))
 
         sample = self.trajectory[self.step_index]
         joints = self.joint_sequence[self.step_index]
         self.publish_pose(joints)
-        self.scene_pub.publish(self._build_scene_markers(sample))
+        self.scene_pub.publish(self._build_scene_markers(sample, joints))
         self.step_index += 1
 
     def _solve_joint_sequence(
@@ -397,7 +417,7 @@ class CR10PickPlaceNode(Node):
         marker.points = list(self.trace_points)
         return marker
 
-    def _build_scene_markers(self, sample: PickPlaceSample) -> MarkerArray:
+    def _build_scene_markers(self, sample: PickPlaceSample, joints: Sequence[float]) -> MarkerArray:
         markers = MarkerArray()
         top_z = self.source_center[2] - self.params.c / 2.0
         table_thickness = 0.06
@@ -450,7 +470,7 @@ class CR10PickPlaceNode(Node):
                 position=self._cube_position_from_sample(sample),
                 size=(self.params.c, self.params.c, self.params.c),
                 color=(0.95, 0.65, 0.12, 0.98),
-                yaw=self._cube_yaw_from_sample(sample),
+                yaw=self._cube_yaw_from_sample(sample, joints),
             )
         )
         markers.markers.append(
@@ -477,9 +497,11 @@ class CR10PickPlaceNode(Node):
             return self.target_center
         return self.source_center
 
-    def _cube_yaw_from_sample(self, sample: PickPlaceSample) -> float:
+    def _cube_yaw_from_sample(self, sample: PickPlaceSample, joints: Sequence[float]) -> float:
         if sample.cube_state == "attached":
-            return sample.pose.wrist_yaw
+            # The effective gripper yaw in the world frame is q1 − q5
+            # (for a top-down grasp with pitch = π/2 and q6 = 0).
+            return normalize_angle(joints[0] - joints[4])
         if sample.cube_state == "target":
             return mirror_yaw(self.params.alpha)
         return self.params.alpha
