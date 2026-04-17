@@ -1,0 +1,171 @@
+<?xml version="1.0"?>
+<robot name="cr10_project">
+  <material name="graphite">
+    <color rgba="0.20 0.22 0.25 1.0"/>
+  </material>
+  <material name="orange">
+    <color rgba="0.92 0.52 0.16 1.0"/>
+  </material>
+  <material name="silver">
+    <color rgba="0.82 0.84 0.86 1.0"/>
+  </material>
+  <material name="blue">
+    <color rgba="0.22 0.47 0.78 1.0"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.11" length="0.12"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+  </link>
+
+  <link name="yaw_link">
+    <visual>
+      <origin xyz="0 0 0.21" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.42"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child link="yaw_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="100" velocity="1.5"/>
+  </joint>
+
+  <link name="shoulder_support_link">
+    <visual>
+      <origin xyz="0.06 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 0.08 0.08"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+  </link>
+
+  <joint name="shoulder_support_joint" type="fixed">
+    <parent link="yaw_link"/>
+    <child link="shoulder_support_link"/>
+    <origin xyz="0 0 0.42" rpy="0 0 0"/>
+  </joint>
+
+  <link name="upper_arm_link">
+    <visual>
+      <origin xyz="0.21 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.42 0.06 0.06"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+
+  <joint name="joint2" type="revolute">
+    <parent link="shoulder_support_link"/>
+    <child link="upper_arm_link"/>
+    <origin xyz="0.12 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.96706" upper="2.96706" effort="100" velocity="1.5"/>
+  </joint>
+
+  <link name="forearm_link">
+    <visual>
+      <origin xyz="0.17 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.34 0.05 0.05"/>
+      </geometry>
+      <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint3" type="revolute">
+    <parent link="upper_arm_link"/>
+    <child link="forearm_link"/>
+    <origin xyz="0.42 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.96706" upper="2.96706" effort="100" velocity="1.5"/>
+  </joint>
+
+  <link name="wrist_pitch_link">
+    <visual>
+      <origin xyz="0.04 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.08 0.06 0.06"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+  </link>
+
+  <joint name="joint4" type="revolute">
+    <parent link="forearm_link"/>
+    <child link="wrist_pitch_link"/>
+    <origin xyz="0.34 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.31613" upper="3.31613" effort="80" velocity="2.0"/>
+  </joint>
+
+  <link name="wrist_roll_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="0.03" length="0.05"/>
+      </geometry>
+      <material name="silver"/>
+    </visual>
+  </link>
+
+  <joint name="joint5" type="revolute">
+    <parent link="wrist_pitch_link"/>
+    <child link="wrist_roll_link"/>
+    <origin xyz="0.08 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-2.0944" upper="2.0944" effort="50" velocity="2.0"/>
+  </joint>
+
+  <link name="tool_link">
+    <visual>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.10 0.05 0.05"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <visual>
+      <origin xyz="0.08 0.03 -0.04" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.08 0.01 0.08"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+    <visual>
+      <origin xyz="0.08 -0.03 -0.04" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.08 0.01 0.08"/>
+      </geometry>
+      <material name="graphite"/>
+    </visual>
+  </link>
+
+  <joint name="joint6" type="revolute">
+    <parent link="wrist_roll_link"/>
+    <child link="tool_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="30" velocity="2.0"/>
+  </joint>
+
+  <link name="ee_tip"/>
+
+  <joint name="ee_tip_joint" type="fixed">
+    <parent link="tool_link"/>
+    <child link="ee_tip"/>
+    <origin xyz="0.10 0 0" rpy="0 0 0"/>
+  </joint>
+</robot>
